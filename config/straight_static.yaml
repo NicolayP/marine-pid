@@ -1,0 +1,7 @@
+---
+  type: "list_quat"
+  diag: true
+  min_dist: 0.2
+  goals:
+     # x,  y,    z, qx, qy, qz, qw,  u,  v,  w,  p,  q,  r
+    - [10., 0., -50., 0., 0., 0., 1., 0., 0., 0., 0., 0.]

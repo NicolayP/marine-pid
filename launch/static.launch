@@ -1,0 +1,93 @@
+<!-- 
+    > **Example**
+
+    ```
+    roslaunch uuv_gazebo_worlds ocean_waves.launch
+    ```
+
+    ```
+    roslaunch bluerov2_description upload_bluerov2.launch
+    ```
+
+    ```
+    roslaunch mppi_ros start_mppi_controller.launch
+    ```
+-->
+<launch>
+    <arg name="uuv_name" default="rexrov2"
+         doc="Namespace of the vehicle to be controller"/>
+    <!-- Name of the vehicle model -->
+    <arg name="model_name" default="$(arg uuv_name)"/>
+    <!-- Flag to start recoding a rosbag  -->
+    <arg name="record" default="true"
+         doc="Record ROS bag"/>
+
+    <arg name="use_ned_frame" default="false"
+         doc="If true, the reference frame is set to be NED (North-East-Down) instead of Gazebo's default ENU (East-North-Up)"/>
+
+     <!-- old values -->
+     <!-- <arg name="Kp" default="11993.888,11993.888,11993.888,19460.069,19460.069,19460.069"/>
+     <arg name="Kd" default="9077.459,9077.459,9077.459,18880.925,18880.925,18880.925"/>
+     <arg name="Ki" default="321.417,321.417,321.417,2096.951,2096.951,2096.951"/> -->
+
+    <arg name="Kp" default="100, 100, 100, 800, 800, 800"
+         doc="Proportional gain for the PID"/>
+
+    <arg name="Ki" default="0, 0, 0, 0, 0, 0"
+         doc="Integral gain for the PID"/>
+
+    <arg name="Kd" default="300, 300, 300, 500, 500, 500"
+         doc="differential gain for the PID"/>
+
+
+    <!-- <arg name="waypoints"
+         default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/marine_static.yaml"
+         doc="Configuration file for the PID waypoints"/> -->
+    <arg name="waypoints"
+          default="$(find pid)/config/debug_static.yaml"
+          doc="Configuration file for the PID waypoints"/>
+
+    <arg name="state_dim" default="13"
+         doc="the dimensionality of the state vector"/>
+
+    <arg name="action_dim" default="6"
+         doc="the dimensionality of the action vector"/>
+
+    <arg name="log" default="True"
+         doc="True: logs everything in tensorboard."/>
+
+    <arg name="log_path" default="$(find mppi_ros)/log/marine_paper/pid/static_cost"
+         doc="Path to save the log"/>
+
+    <arg name="thruster_message" default="WrenchStamped"
+         doc="Message type used to send commands, will be use to create the appropriate
+              publisher, supported are WrenchStamped/Wrendch/Twist"/>
+
+    <arg name="visu_samples" default="True"
+         doc="Enabbles visualisation of samples and obstacles in rviz"/>
+    
+    <arg name="odom_frame" default="world"
+          doc="Used as frame when publishing visualisation markers"/>
+    
+    <node name="pid" pkg="pid" type="pid_node.py" output="screen">
+        <remap from="odom" to="$(arg uuv_name)/pose_gt"/>
+        <remap from="thruster_input" to="$(arg uuv_name)/thruster_manager/input_stamped"/>
+        <param name="thruster_message" value="$(arg thruster_message)"/>
+        <param name="state_dim" value="$(arg state_dim)"/>
+        <param name="action_dim" value="$(arg action_dim)"/>
+        <rosparam command="load" file="$(arg waypoints)" ns="waypoints"/>
+        <param name="log" value="$(arg log)"/>
+        <param name="log_path" value="$(arg log_path)"/>
+        <param name="visu_samples" value="$(arg visu_samples)"/>
+        <param name="odom_frame" value="$(arg odom_frame)"/>
+        <rosparam subst_value="true">
+          Kp: [$(arg Kp)]
+          Kd: [$(arg Kd)]
+          Ki: [$(arg Ki)]
+          inertial_frame_id: world
+        </rosparam>
+    </node>
+
+    <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
+          args="record -o $(arg log_path)/bags/ $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped"/>
+</launch>
