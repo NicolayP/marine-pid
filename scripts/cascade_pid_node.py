@@ -152,13 +152,6 @@ class CascadePIDNode(object):
             self._inertial_frame_id = rospy.get_param("~inertial_frame_id")
 
         self._odom_is_init = False
-
-        # Subsc ribe to odometry topic
-        self._odom_topic_sub = rospy.Subscriber(
-            'odom', numpy_msg(Odometry), self._odometry_callback)
-
-        self._thrust_pub = rospy.Publisher(
-            'thruster_input', WrenchStamped, queue_size=1)
         
         self._pose = {}
         self._errors = {}
@@ -175,7 +168,6 @@ class CascadePIDNode(object):
             Marker,
             queue_size=10
         )
-
         # 6 publishers for P errors
         # 6 publishers for I errors
         # 6 publishers for D errors
@@ -214,6 +206,13 @@ class CascadePIDNode(object):
 
         self._pose_pid = PIDClass(self._Kd, self._Ki, self._Kd)
         self._vel_pid = PIDClass(self._Kd_v, self._Ki_v, self._Kd_v)
+
+        self._thrust_pub = rospy.Publisher(
+            'thruster_input', WrenchStamped, queue_size=1)
+
+        # Subscribe to odometry topic
+        self._odom_topic_sub = rospy.Subscriber(
+            'odom', numpy_msg(Odometry), self._odometry_callback)
 
     def _odometry_callback(self, msg):
         if not self._odom_is_init:

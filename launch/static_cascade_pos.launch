@@ -25,11 +25,6 @@
     <arg name="use_ned_frame" default="false"
          doc="If true, the reference frame is set to be NED (North-East-Down) instead of Gazebo's default ENU (East-North-Up)"/>
 
-     <!-- old values -->
-     <!-- <arg name="Kp" default="11993.888,11993.888,11993.888,19460.069,19460.069,19460.069"/>
-     <arg name="Kd" default="9077.459,9077.459,9077.459,18880.925,18880.925,18880.925"/>
-     <arg name="Ki" default="321.417,321.417,321.417,2096.951,2096.951,2096.951"/> -->
-
     <arg name="Kp" default="100, 100, 100, 800, 800, 800"
          doc="Proportional gain for the PID"/>
 
@@ -39,13 +34,18 @@
     <arg name="Kd" default="400, 400, 400, 500, 500, 500"
          doc="differential gain for the PID"/>
 
+    <arg name="Kp_v" default="10, 10, 10, 10, 10, 10"
+         doc="Proportional gain for the PID"/>
+
+    <arg name="Ki_v" default="10, 10, 10, 10, 10, 10"
+         doc="Integral gain for the PID"/>
+
+    <arg name="Kd_v" default="30, 30, 30, 30, 30, 30"
+         doc="differential gain for the PID"/>
+
     <arg name="waypoints"
          default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/down.yaml"
          doc="Configuration file for the PID waypoints"/>
-
-    <!-- <arg name="waypoints"
-          default="$(find pid)/config/debug_static.yaml"
-          doc="Configuration file for the PID waypoints"/> -->
 
     <arg name="state_dim" default="13"
          doc="the dimensionality of the state vector"/>
@@ -56,7 +56,7 @@
     <arg name="log" default="True"
          doc="True: logs everything in tensorboard."/>
 
-    <arg name="log_path" default="$(find mppi_ros)/log/marine_paper/pid/static_cost"
+    <arg name="log_path" default="$(find mppi_ros)/log/marine_paper/cascade_pid/static_cost_pos"
          doc="Path to save the log"/>
 
     <arg name="thruster_message" default="WrenchStamped"
@@ -69,7 +69,7 @@
     <arg name="odom_frame" default="world"
           doc="Used as frame when publishing visualisation markers"/>
     
-    <node name="pid" pkg="pid" type="pid_node.py" output="screen">
+    <node name="pid" pkg="pid" type="cascade_pid_node.py" output="screen">
         <remap from="odom" to="$(arg uuv_name)/pose_gt"/>
         <remap from="thruster_input" to="$(arg uuv_name)/thruster_manager/input_stamped"/>
         <param name="thruster_message" value="$(arg thruster_message)"/>
@@ -82,12 +82,20 @@
         <param name="odom_frame" value="$(arg odom_frame)"/>
         <rosparam subst_value="true">
           Kp: [$(arg Kp)]
-          Kd: [$(arg Kd)]
           Ki: [$(arg Ki)]
+          Kd: [$(arg Kd)]
+          Kp_v: [$(arg Kp_v)]
+          Ki_v: [$(arg Ki_v)]
+          Kd_v: [$(arg Kd_v)]
           inertial_frame_id: world
         </rosparam>
     </node>
 
+
+    <node name="solve_rqt" pkg="pid" type="solve_rqt.py" output="screen"/>
     <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
           args="record -o $(arg log_path)/bags/ $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped $(arg uuv_name)/thrusters/0/input $(arg uuv_name)/thrusters/1/input $(arg uuv_name)/thrusters/2/input $(arg uuv_name)/thrusters/3/input $(arg uuv_name)/thrusters/4/input $(arg uuv_name)/thrusters/5/input"/>
+<!-- 
+     <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
+          args="record -o $(arg log_path)/bags/ -a"/> -->
 </launch>

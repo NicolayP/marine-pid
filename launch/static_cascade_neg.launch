@@ -25,13 +25,13 @@
     <arg name="use_ned_frame" default="false"
          doc="If true, the reference frame is set to be NED (North-East-Down) instead of Gazebo's default ENU (East-North-Up)"/>
 
-    <arg name="Kp" default="10, 10, 10, 80, 80, 80"
+    <arg name="Kp" default="100, 100, 100, 800, 800, 800"
          doc="Proportional gain for the PID"/>
 
-    <arg name="Ki" default="0, 0, 0, 0, 0, 0"
+    <arg name="Ki" default="10, 10, 10, 30, 30, 30"
          doc="Integral gain for the PID"/>
 
-    <arg name="Kd" default="10, 10, 10, 10, 10, 10"
+    <arg name="Kd" default="400, 400, 400, 500, 500, 500"
          doc="differential gain for the PID"/>
 
     <arg name="Kp_v" default="10, 10, 10, 10, 10, 10"
@@ -43,14 +43,9 @@
     <arg name="Kd_v" default="30, 30, 30, 30, 30, 30"
          doc="differential gain for the PID"/>
 
-
-
     <arg name="waypoints"
-         default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/marine_static.yaml"
+         default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/down.yaml"
          doc="Configuration file for the PID waypoints"/>
-    <!-- <arg name="waypoints"
-          default="$(find pid)/config/debug_static.yaml"
-          doc="Configuration file for the PID waypoints"/> -->
 
     <arg name="state_dim" default="13"
          doc="the dimensionality of the state vector"/>
@@ -61,7 +56,7 @@
     <arg name="log" default="True"
          doc="True: logs everything in tensorboard."/>
 
-    <arg name="log_path" default="$(find mppi_ros)/log/marine_paper/pid/static_cost"
+    <arg name="log_path" default="$(find mppi_ros)/log/marine_paper/cascade_pid/static_cost_neg"
          doc="Path to save the log"/>
 
     <arg name="thruster_message" default="WrenchStamped"
@@ -99,7 +94,7 @@
 
     <node name="solve_rqt" pkg="pid" type="solve_rqt.py" output="screen"/>
     <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
-          args="record -o $(arg log_path)/bags/ $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped"/>
+          args="record -o $(arg log_path)/bags/ $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped $(arg uuv_name)/thrusters/0/input $(arg uuv_name)/thrusters/1/input $(arg uuv_name)/thrusters/2/input $(arg uuv_name)/thrusters/3/input $(arg uuv_name)/thrusters/4/input $(arg uuv_name)/thrusters/5/input"/>
 <!-- 
      <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
           args="record -o $(arg log_path)/bags/ -a"/> -->

@@ -4,7 +4,7 @@ import numpy as np
 from rospy.numpy_msg import numpy_msg
 from geometry_msgs.msg import WrenchStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32
 
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
@@ -118,13 +118,6 @@ class PIDNode(object):
             self._inertial_frame_id = rospy.get_param("~inertial_frame_id")
 
         self._odom_is_init = False
-
-        # Subsc ribe to odometry topic
-        self._odom_topic_sub = rospy.Subscriber(
-            'odom', numpy_msg(Odometry), self._odometry_callback)
-
-        self._thrust_pub = rospy.Publisher(
-            'thruster_input', WrenchStamped, queue_size=1)
         
         self._pose = {}
         self._errors = {}
@@ -134,8 +127,7 @@ class PIDNode(object):
         self._dt = 0
         self._prev_time = rospy.get_time()
 
-        self._pid = PIDClass(self._Kp, self._Ki, self._kd)
-
+        self._pid = PIDClass(self._Kp, self._Ki, self._Kd)
         # Publish cost representation in rviz.
         self._vis = rospy.Publisher(
             "pid/waypoints/",
@@ -143,11 +135,37 @@ class PIDNode(object):
             queue_size=10
         )
 
-        self._error_pid1 = rospy.Publisher(
-            "pid/errors/",
-            Float32MultiArray,
+        # 6 publishers for P errors
+        # 6 publishers for I errors
+        # 6 publishers for D errors
+        names = ["x", "y", "z", "roll", "pitch", "yaw",
+                 "I_x", "I_y", "I_z", "I_roll", "I_pitch", "I_yaw",
+                 "D_x", "D_y", "D_z", "D_roll", "D_pitch", "D_yaw",]
+
+        self._error_pid1 = [rospy.Publisher(
+            "pid1/errors/%s" % n,
+            Float32,
+            queue_size=100
+        ) for n in names]
+
+        # 6 publishers for P errors
+        # 6 publishers for I errors
+        # 6 publishers for D errors
+
+        axis = ["x", "y", "z", "roll", "pitch", "yaw"]
+
+        self._pid1_output = [rospy.Publisher(
+            "pid1/output/%s" % n,
+            Float32,
             queue_size=10
-        )
+        ) for n in axis]
+
+        self._thrust_pub = rospy.Publisher(
+            'thruster_input', WrenchStamped, queue_size=1)
+
+        # Subscribe to odometry topic
+        self._odom_topic_sub = rospy.Subscriber(
+            'odom', numpy_msg(Odometry), self._odometry_callback)
 
     def _odometry_callback(self, msg):
         if not self._odom_is_init:
@@ -278,7 +296,7 @@ class PIDNode(object):
         self._vis.publish(m)
 
     def update_controller(self):
-        forces = self._pid.update_pid(self._errors, self._dt)
+        forces, self._int = self._pid.update_pid(self._errors, self._dt)
         self.publish_contorl_wrench(forces)
 
     def publish_contorl_wrench(self, force):
@@ -308,12 +326,16 @@ class PIDNode(object):
     def publish_errors(self):
         if not self._odom_is_init:
             return
-
         # PID 1 (external)
-        error_msg = Float32MultiArray()
-        error_msg.data = np.concatenate([self._errors['prop'], self._errors['deriv'], self._int])
-        self._error_pid.publish(error_msg)
-
+        for p, e in zip(self._error_pid1, np.concatenate([np.dot(self._Kp, self._errors['prop']),
+                                                          np.dot(self._Ki, self._int),
+                                                          np.dot(self._Kd, self._errors['deriv'])])):
+            p.publish(e)
+        
+        for p, o in zip(self._pid1_output, np.dot(self._Kp, self._errors['prop']) + \
+                                           np.dot(self._Ki, self._int) + \
+                                           np.dot(self._Kd, self._errors['deriv'])):
+            p.publish(o)
 if __name__ == "__main__":
     try:
         node = PIDNode()

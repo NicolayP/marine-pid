@@ -29,11 +29,10 @@
      <!-- <arg name="Kp" default="11993.888,11993.888,11993.888,19460.069,19460.069,19460.069"/>
      <arg name="Kd" default="9077.459,9077.459,9077.459,18880.925,18880.925,18880.925"/>
      <arg name="Ki" default="321.417,321.417,321.417,2096.951,2096.951,2096.951"/> -->
-
     <arg name="Kp" default="100, 100, 100, 800, 800, 800"
          doc="Proportional gain for the PID"/>
 
-    <arg name="Ki" default="10, 10, 10, 30, 30, 30"
+    <arg name="Ki" default="50, 50, 50, 80, 80, 80"
          doc="Integral gain for the PID"/>
 
     <arg name="Kd" default="400, 400, 400, 500, 500, 500"
@@ -56,7 +55,7 @@
     <arg name="log" default="True"
          doc="True: logs everything in tensorboard."/>
 
-    <arg name="log_path" default="$(find mppi_ros)/log/marine_paper/pid/static_cost"
+    <arg name="log_path" default="$(find mppi_ros)/log/marine_paper/pid/static_cost_pos"
          doc="Path to save the log"/>
 
     <arg name="thruster_message" default="WrenchStamped"
