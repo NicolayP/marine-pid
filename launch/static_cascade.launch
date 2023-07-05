@@ -25,26 +25,29 @@
     <arg name="use_ned_frame" default="false"
          doc="If true, the reference frame is set to be NED (North-East-Down) instead of Gazebo's default ENU (East-North-Up)"/>
 
-    <arg name="Kp" default="100, 100, 100, 800, 800, 800"
+    <arg name="Kp" default="1, 1, 1, 1, 1, 1"
          doc="Proportional gain for the PID"/>
 
-    <arg name="Ki" default="10, 10, 10, 30, 30, 30"
+    <arg name="Ki" default="0.1, 0.1, 0.1, 0.1, 0.1, 0.1"
          doc="Integral gain for the PID"/>
 
-    <arg name="Kd" default="400, 400, 400, 500, 500, 500"
+    <arg name="Kd" default="0.5, 0.5, 0.5, 0.5, 0.5, 0.5"
          doc="differential gain for the PID"/>
 
-    <arg name="Kp_v" default="40, 40, 40, 80, 80, 80"
+    <arg name="Kp_v" default="100, 100, 100, 500, 500, 500"
          doc="Proportional gain for the PID"/>
 
-    <arg name="Ki_v" default="10, 10, 10, 50, 50, 50"
+    <arg name="Ki_v" default="20, 20, 20, 40, 40, 40"
          doc="Integral gain for the PID"/>
 
-    <arg name="Kd_v" default="30, 30, 30, 40, 40, 40"
+    <arg name="Kd_v" default="100, 100, 100, 300, 300, 300"
          doc="differential gain for the PID"/>
+
+     <arg name="cost_type" default="yaw"
+          doc="the type of cost function to use for the experiments. Available |forward|back|up|down"/>
 
     <arg name="waypoints"
-         default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/down.yaml"
+         default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/$(arg cost_type).yaml"
          doc="Configuration file for the PID waypoints"/>
 
     <arg name="state_dim" default="13"
@@ -93,9 +96,14 @@
 
 
     <node name="solve_rqt" pkg="pid" type="solve_rqt.py" output="screen"/>
+    <!-- <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
+          args="record -p -o $(arg log_path)/bags/$(arg cost_type) duration=2m $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped $(arg uuv_name)/thrusters/0/input $(arg uuv_name)/thrusters/1/input $(arg uuv_name)/thrusters/2/input $(arg uuv_name)/thrusters/3/input $(arg uuv_name)/thrusters/4/input $(arg uuv_name)/thrusters/5/input -e '(.*)pid(.*)'"/> -->
+
     <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
-          args="record -o $(arg log_path)/bags/ $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped $(arg uuv_name)/thrusters/0/input $(arg uuv_name)/thrusters/1/input $(arg uuv_name)/thrusters/2/input $(arg uuv_name)/thrusters/3/input $(arg uuv_name)/thrusters/4/input $(arg uuv_name)/thrusters/5/input"/>
-<!-- 
-     <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
-          args="record -o $(arg log_path)/bags/ -a"/> -->
+          args="record -p -o $(arg log_path)/bags/$(arg cost_type) --duration=2m -e '(.*)pid(.*)|(.*)thruster(.*)|(.*)pose_gt(.*)'"/>
+    <node pkg="mppi_ros" type="copy_cost.py" name="copy_cost" output="screen">
+          <param name="cost_file" value="$(arg waypoints)"/>
+          <param name="log" value="$(arg log_path)/bags"/>
+     </node>
+
 </launch>

@@ -30,22 +30,21 @@
      <arg name="Kd" default="9077.459,9077.459,9077.459,18880.925,18880.925,18880.925"/>
      <arg name="Ki" default="321.417,321.417,321.417,2096.951,2096.951,2096.951"/> -->
 
-    <arg name="Kp" default="100, 100, 100, 800, 800, 800"
+    <arg name="Kp" default="200, 200, 200, 800, 800, 800"
          doc="Proportional gain for the PID"/>
 
-    <arg name="Ki" default="10, 10, 10, 30, 30, 30"
+    <arg name="Ki" default="40, 40, 40, 70, 70, 70"
          doc="Integral gain for the PID"/>
 
-    <arg name="Kd" default="400, 400, 400, 500, 500, 500"
+    <arg name="Kd" default="1000, 1000, 1000, 700, 700, 700"
          doc="differential gain for the PID"/>
 
-    <arg name="waypoints"
-         default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/down.yaml"
-         doc="Configuration file for the PID waypoints"/>
+     <arg name="cost_type" default="forward"
+          doc="the type of cost function to use for the experiments. Available |forward|back|up|down"/>
 
-    <!-- <arg name="waypoints"
-          default="$(find pid)/config/debug_static.yaml"
-          doc="Configuration file for the PID waypoints"/> -->
+    <arg name="waypoints"
+         default="$(find mppi_ros)/scripts/mppi_tf/config/tasks/$(arg cost_type).yaml"
+         doc="Configuration file for the PID waypoints"/>
 
     <arg name="state_dim" default="13"
          doc="the dimensionality of the state vector"/>
@@ -89,5 +88,11 @@
     </node>
 
     <node pkg="rosbag" type="record" name="rosbag_record" output="screen"
-          args="record -o $(arg log_path)/bags/ $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped $(arg uuv_name)/thrusters/0/input $(arg uuv_name)/thrusters/1/input $(arg uuv_name)/thrusters/2/input $(arg uuv_name)/thrusters/3/input $(arg uuv_name)/thrusters/4/input $(arg uuv_name)/thrusters/5/input"/>
+          args="record -p -o $(arg log_path)/bags/$(arg cost_type) --duration=2m $(arg uuv_name)/pose_gt $(arg uuv_name)/thruster_manager/input_stamped $(arg uuv_name)/thrusters/0/input $(arg uuv_name)/thrusters/1/input $(arg uuv_name)/thrusters/2/input $(arg uuv_name)/thrusters/3/input $(arg uuv_name)/thrusters/4/input $(arg uuv_name)/thrusters/5/input"/>
+
+    <node pkg="mppi_ros" type="copy_cost.py" name="copy_cost" output="screen">
+          <param name="cost_file" value="$(arg waypoints)"/>
+          <param name="log" value="$(arg log_path)/bags"/>
+     </node>
+
 </launch>
