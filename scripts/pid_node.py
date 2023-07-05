@@ -125,6 +125,7 @@ class PIDNode(object):
 
         # Time step
         self._dt = 0
+        self._period = 0.1
         self._prev_time = rospy.get_time()
 
         self._pid = PIDClass(self._Kp, self._Ki, self._Kd)
@@ -214,18 +215,22 @@ class PIDNode(object):
         # Store velocity vector
         self._vel = np.hstack((lin_vel, ang_vel))
 
-        self._update_time_step()
+        if not self._update_time_step():
+            return
         self._update_goal()
         self._update_error()
         self._update_vis()
-        self.update_controller()
+        self._update_controller()
         self.publish_errors()
 
     def _update_time_step(self):
         """Update time step."""
         t = rospy.get_time()
         self._dt = t - self._prev_time
+        if self._dt < self._period:
+            return False
         self._prev_time = t
+        return True
 
     def _update_goal(self):
         dist = np.linalg.norm(self._pose['pos'] - self._goal_list[self._current_goal_idx][:3])
@@ -295,7 +300,7 @@ class PIDNode(object):
             m.points.append(p)
         self._vis.publish(m)
 
-    def update_controller(self):
+    def _update_controller(self):
         forces, self._int = self._pid.update_pid(self._errors, self._dt)
         self.publish_contorl_wrench(forces)
 
@@ -336,6 +341,7 @@ class PIDNode(object):
                                            np.dot(self._Ki, self._int) + \
                                            np.dot(self._Kd, self._errors['deriv'])):
             p.publish(o)
+
 if __name__ == "__main__":
     try:
         node = PIDNode()
