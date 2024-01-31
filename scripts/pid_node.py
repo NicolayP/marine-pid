@@ -3,18 +3,22 @@ import rospy
 import numpy as np
 from rospy.numpy_msg import numpy_msg
 from geometry_msgs.msg import WrenchStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Empty
 
 from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Twist
 
-from tf_quaternion.transformations import quaternion_multiply, quaternion_inverse, quaternion_from_euler
+from tf.transformations import quaternion_multiply, quaternion_inverse, quaternion_from_euler
+
+import tf
 
 from pid_class import PIDClass
 
 
 rospy.init_node("PID_DP_CONTROLLER")
+
 
 def q_to_matrix(q):
     """Convert quaternion into orthogonal rotation matrix.
@@ -161,17 +165,26 @@ class PIDNode(object):
             queue_size=10
         ) for n in axis]
 
-        self._thrust_pub = rospy.Publisher(
-            'thruster_input', WrenchStamped, queue_size=1)
+        # self._thrust_pub = rospy.Publisher(
+        #     'thruster_input', WrenchStamped, queue_size=1)
+
+        self._twist_pub = rospy.Publisher(
+            '/bluerov2/cmd_vel', Twist, queue_size=1)
 
         # Subscribe to odometry topic
         self._odom_topic_sub = rospy.Subscriber(
             'odom', numpy_msg(Odometry), self._odometry_callback)
+        
+        start_service = rospy.Subscriber('/log_data/start_log', Empty, self.start_logging)
+        self.started = False
+
+    def start_logging(self, msg):
+        rospy.loginfo("Start PID")
+        self.started = True
 
     def _odometry_callback(self, msg):
-        if not self._odom_is_init:
-            self._odom_is_init = True
-
+        if not self.started:
+            return
         """Odometry topic subscriber callback function."""
         # The frames of reference delivered by the odometry seems to be as
         # follows
@@ -215,13 +228,38 @@ class PIDNode(object):
         # Store velocity vector
         self._vel = np.hstack((lin_vel, ang_vel))
 
+        if not self._odom_is_init:
+            self._goal_world_list= self._compute_world_goal(self._goal_list, self._pose)
+            print(self._goal_world_list)
+            self._odom_is_init = True
+
+
         if not self._update_time_step():
             return
-        self._update_goal()
         self._update_error()
+        self._update_goal()
         self._update_vis()
         self._update_controller()
         self.publish_errors()
+
+    def _compute_world_goal(self, goal_list, pose):
+        rot = q_to_matrix(pose['rot'])
+        quat = pose['rot']
+        trans = pose['pos']
+        T = np.zeros(shape=(4, 4))
+        T[0:3, 0:3] = rot
+        T[0:3, 3] = trans
+        T[3, 3] = 1.
+        goals = []
+        for goal in goal_list:
+            goal_pos_homo = np.array([goal[0], goal[1], goal[2], 1.])
+            goal_quat = goal[3:]
+
+            world_pos = (T @ goal_pos_homo)[:3]
+            world_ori = quaternion_multiply(pose["rot"], goal_quat)
+            world_goal = np.concatenate([world_pos, world_ori], axis=-1)
+            goals.append(world_goal)
+        return goals
 
     def _update_time_step(self):
         """Update time step."""
@@ -233,15 +271,17 @@ class PIDNode(object):
         return True
 
     def _update_goal(self):
-        dist = np.linalg.norm(self._pose['pos'] - self._goal_list[self._current_goal_idx][:3])
-        if dist < 0.2:
-            if len(self._goal_list) > self._current_goal_idx + 1:        
+        pos_dist = np.linalg.norm(self._errors['pos'])
+        ang_dist = np.linalg.norm(self._errors["rpy"])
+        if pos_dist < 0.1 and ang_dist < 0.2:
+            rospy.loginfo("Goal Reached")
+            if len(self._goal_world_list) > self._current_goal_idx + 1:        
                 self._current_goal_idx += 1
 
     def _update_error(self):
         if not self._odom_is_init:
             return
-        goal = self._goal_list[self._current_goal_idx]
+        goal = self._goal_world_list[self._current_goal_idx]
 
         goal_pos = goal[:3]
         pos = self._pose['pos']
@@ -265,6 +305,7 @@ class PIDNode(object):
         
         self._errors['deriv'] = -vel
         self._errors['prop'] = np.hstack((self._errors['pos'], self._errors['rpy']))
+
         self._error_vel = self._errors['deriv']
 
     def _update_vis(self):
@@ -292,7 +333,7 @@ class PIDNode(object):
         p.y = self._pose['pos'][1]
         p.z = self._pose['pos'][2]
         m.points.append(p)
-        for t in self._goal_list[self._current_goal_idx:]:
+        for t in self._goal_world_list[self._current_goal_idx:]:
             p = Point()
             p.x = t[0]
             p.y = t[1]
@@ -302,7 +343,8 @@ class PIDNode(object):
 
     def _update_controller(self):
         forces, self._int = self._pid.update_pid(self._errors, self._dt)
-        self.publish_contorl_wrench(forces)
+        self.publish_twist(forces)
+        #self.publish_contorl_wrench(forces)
 
     def publish_contorl_wrench(self, force):
         """Publish the thruster manager control set-point.
@@ -327,6 +369,28 @@ class PIDNode(object):
         force_msg.wrench.torque.z = force[5]
 
         self._thrust_pub.publish(force_msg)
+
+    def publish_twist(self, force):
+        """Publish the thruster manager control set-point.
+        
+        > *Input arguments*
+        
+        * `force` (*type:* `numpy.array`): 6 DoF control 
+        set-point wrench vector
+        """
+        if not self._odom_is_init:
+            return
+
+        twist = Twist()
+        twist.linear.x = force[0]
+        twist.linear.y = force[1]
+        twist.linear.z = force[2]
+
+        twist.angular.x = force[3]
+        twist.angular.y = force[4]
+        twist.angular.z = force[5]
+        #print(twist)
+        self._twist_pub.publish(twist)
 
     def publish_errors(self):
         if not self._odom_is_init:
